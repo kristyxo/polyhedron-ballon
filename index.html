@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>正多面體熱氣球：物理與數學綜合探究模擬器</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<style>
+:root{
+    --primary:#2c3e50; --accent:#2980b9; --success:#27ae60; --danger:#c0392b; --bg:#f4f6f9;
+}
+*{box-sizing:border-box}
+body{
+    font-family:-apple-system,BlinkMacSystemFont,"Microsoft JhengHei","PingFang TC","Segoe UI",Roboto,Arial,sans-serif;
+    margin:0; padding:15px; background:var(--bg); color:#2c3e50;
+}
+.header{text-align:center;margin:0 auto 15px;max-width:1300px;background:#fff;padding:15px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.05)}
+.header h1{margin:0 0 6px;font-size:22px;color:var(--primary)}
+.header p{margin:0;font-size:13px;color:#666}
+
+.main-layout{max-width:1300px;margin:0 auto;display:grid;grid-template-columns:320px minmax(0,1fr);gap:15px;align-items:start}
+.card{background:#fff;border-radius:8px;padding:15px;box-shadow:0 2px 8px rgba(0,0,0,.05);margin-bottom:15px}
+.card h2{font-size:15px;color:var(--primary);margin:0 0 10px;border-bottom:2px solid #edf2f7;padding-bottom:6px}
+.form-item{margin-bottom:14px}
+.form-item label{display:flex;justify-content:space-between;font-size:12px;font-weight:600;margin-bottom:5px}
+.form-item select{width:100%;padding:6px;border:1px solid #cbd5e0;border-radius:4px;font-size:13px}
+.hint{font-size:11px;color:#718096;margin-top:4px;line-height:1.5}
+
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:8px;border-radius:4px;background:var(--track,#e2e8f0);outline-offset:4px;margin:6px 0}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:var(--accent);border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35);cursor:pointer}
+input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:var(--accent);border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35);cursor:pointer}
+input[type=range]::-moz-range-track{background:transparent}
+
+.preset-row{display:flex;gap:8px;flex-wrap:wrap}
+.btn{padding:8px 12px;border:1px solid #cbd5e0;background:#f7fafc;color:var(--primary);cursor:pointer;border-radius:6px;font-weight:600;font-size:12px}
+.btn:hover{background:#edf2f7}
+.btn.primary{background:var(--success);border-color:var(--success);color:#fff}
+.btn.primary:hover{background:#219653}
+
+.nav-tabs{display:flex;gap:8px;margin-bottom:12px;border-bottom:2px solid #e2e8f0;padding-bottom:8px;flex-wrap:wrap}
+.tab-btn{padding:8px 14px;border:none;background:#e2e8f0;color:#4a5568;cursor:pointer;border-radius:6px;font-weight:bold;font-size:13px}
+.tab-btn[aria-selected=true]{background:var(--primary);color:#fff}
+.tab-btn:focus-visible,.btn:focus-visible{outline:3px solid #90cdf4;outline-offset:2px}
+.tab-content{display:none}
+.tab-content.active{display:block}
+
+.canvas-wrapper{width:100%;height:380px;border-radius:8px;overflow:hidden;background:#1a202c;position:relative}
+#webglCanvas{width:100%;height:100%}
+#webglCanvas canvas{display:block}
+.hud{position:absolute;left:10px;top:10px;color:#fff;background:rgba(0,0,0,.45);padding:6px 10px;border-radius:6px;font-size:12px;line-height:1.6;pointer-events:none;font-variant-numeric:tabular-nums}
+.relaunch{position:absolute;right:10px;top:10px}
+.nogl{color:#fff;padding:30px;font-size:14px;line-height:1.7}
+
+.status-badge{padding:10px;border-radius:6px;font-weight:bold;text-align:center;font-size:14px;margin-bottom:10px}
+.bg-success{background:#d4edda;color:#155724;border:1px solid #c3e6cb}
+.bg-danger{background:#f8d7da;color:#721c24;border:1px solid #f5c6cb}
+.warn{background:#fffaf0;border:1px solid #fbd38d;color:#7b341e;border-radius:6px;padding:8px 10px;font-size:12px;line-height:1.6;margin-bottom:10px}
+.warn[hidden]{display:none}
+
+.grid-data{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px}
+.data-card{background:#f7fafc;padding:10px;border-radius:6px;border-left:3px solid var(--accent)}
+.data-card .label{font-size:11px;color:#718096;font-weight:bold}
+.data-card .value{font-size:14px;color:var(--primary);font-weight:bold;margin-top:2px;font-variant-numeric:tabular-nums}
+.data-card.key{border-left-color:var(--success);background:#f0fff4}
+
+.info-box{background:#ebf8ff;border-left:4px solid #3182ce;padding:10px 12px;border-radius:4px;font-size:12px;line-height:1.75;margin-bottom:10px}
+.info-box.green{background:#f0fff4;border-left-color:#38a169}
+.info-box.amber{background:#fffaf0;border-left-color:#dd6b20}
+.info-box ul{margin:4px 0 0;padding-left:18px}
+
+.table-wrap{overflow-x:auto}
+table.poly-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:6px;min-width:620px}
+table.poly-table th,table.poly-table td{border:1px solid #e2e8f0;padding:7px;text-align:center}
+table.poly-table th{background:#edf2f7;color:#2d3748}
+table.poly-table tr.highlight{background:#feebc8;font-weight:bold}
+.ok{color:#276749;font-weight:bold}.no{color:#c53030;font-weight:bold}
+
+.chart-box svg{width:100%;height:auto;display:block}
+.chart-box text{font-size:11px;fill:#4a5568}
+
+.net-toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+.net-toolbar select{padding:7px;border:1px solid #cbd5e0;border-radius:4px;font-size:13px}
+.svg-container{width:100%;height:460px;background:#fff;border:1px solid #e2e8f0;border-radius:6px}
+.svg-container svg{width:100%;height:100%;display:block}
+
+#printArea{display:none}
+
+@media (max-width:900px){
+    body{padding:10px}
+    .main-layout{grid-template-columns:1fr}
+    .grid-data{grid-template-columns:repeat(2,1fr)}
+    .canvas-wrapper{height:320px}
+}
+
+/* ===== 列印：只輸出展開圖 ===== */
+@page{size:A4 portrait;margin:10mm}
+@media print{
+    body.printing{background:#fff;padding:0}
+    body.printing > *:not(#printArea){display:none !important}
+    body.printing #printArea{display:block}
+    .print-page{width:190mm;height:277mm;overflow:hidden;break-after:page;page-break-after:always}
+    .print-page:last-child{break-after:auto;page-break-after:auto}
+    .pp-head{height:18mm;font-size:10pt;line-height:1.4;border-bottom:1px solid #333;margin-bottom:2mm}
+    .pp-head b{font-size:13pt}
+    .print-page svg{width:190mm;height:255mm;display:block}
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+    <h1>正多面體熱氣球：物理與數學綜合探究</h1>
+    <p>阿基米德浮力・理想氣體密度・歐拉公式・體面比 V/S 與最小棱長 a<sub>min</sub>・展開圖黏貼配對</p>
+</div>
+
+<div class="main-layout">
+    <!-- 左側控制面板 -->
+    <div>
+        <div class="card">
+            <h2>0. 情境預設</h2>
+            <div class="preset-row">
+                <button class="btn" id="presetPaper" type="button">論文情境：紙</button>
+                <button class="btn" id="presetCloth" type="button">論文情境：布</button>
+            </div>
+            <div class="hint">紙 17 g/m²、布 50 g/m²，內溫 60°C、室溫 26°C，採用正十二面體。</div>
+        </div>
+
+        <div class="card">
+            <h2>1. 正多面體幾何參數</h2>
+            <div class="form-item">
+                <label for="shapeSelect">選擇正多面體：</label>
+                <select id="shapeSelect">
+                    <option value="tetrahedron">正四面體 (4面)</option>
+                    <option value="cube">正六面體 / 立方體 (6面)</option>
+                    <option value="octahedron">正八面體 (8面)</option>
+                    <option value="dodecahedron" selected>正十二面體 (12面)</option>
+                    <option value="icosahedron">正二十面體 (20面)</option>
+                </select>
+            </div>
+            <div class="form-item">
+                <label for="edgeLength"><span>棱長 a</span><span><span id="edgeVal">0.50</span> m</span></label>
+                <input type="range" id="edgeLength" min="0.3" max="2.0" step="0.05" value="0.5">
+                <div class="hint" id="aminHint">-</div>
+            </div>
+            <div class="form-item">
+                <label for="paperGSM"><span>材料面密度 σ</span><span><span id="gsmVal">17</span> g/m²</span></label>
+                <input type="range" id="paperGSM" min="10" max="50" step="1" value="17">
+                <div class="hint">薄棉紙／拷貝紙約 12~17 g/m²，輕薄布料約 40~50 g/m²。</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>2. 溫度控制</h2>
+            <div class="form-item">
+                <label for="tempIn"><span>球內空氣溫度</span><span><span id="tempInVal">60</span> °C</span></label>
+                <input type="range" id="tempIn" min="30" max="130" step="1" value="60">
+                <div class="hint">電吹風出風口約 50~70°C；再高需要更強的熱源。</div>
+            </div>
+            <div class="form-item">
+                <label for="tempOut"><span>環境空氣溫度</span><span><span id="tempOutVal">26</span> °C</span></label>
+                <input type="range" id="tempOut" min="-10" max="40" step="1" value="26">
+            </div>
+        </div>
+    </div>
+
+    <!-- 右側 -->
+    <div>
+        <div class="nav-tabs" role="tablist" aria-label="探究內容">
+            <button class="tab-btn" role="tab" id="tab-sim3d" aria-controls="sim3d" aria-selected="true" tabindex="0" data-tab="sim3d">3D 升空與受力</button>
+            <button class="tab-btn" role="tab" id="tab-math" aria-controls="math" aria-selected="false" tabindex="-1" data-tab="math">數學性質與歐拉公式</button>
+            <button class="tab-btn" role="tab" id="tab-table" aria-controls="table" aria-selected="false" tabindex="-1" data-tab="table">五種立體對照與 a<sub>min</sub></button>
+            <button class="tab-btn" role="tab" id="tab-net2d" aria-controls="net2d" aria-selected="false" tabindex="-1" data-tab="net2d">2D 展開圖（可列印）</button>
+        </div>
+
+        <!-- TAB 1 -->
+        <div id="sim3d" class="tab-content active" role="tabpanel" aria-labelledby="tab-sim3d">
+            <div class="canvas-wrapper">
+                <div id="webglCanvas"></div>
+                <div class="hud" id="hud" aria-hidden="true"></div>
+                <button class="btn relaunch" id="relaunch" type="button">↺ 重新放飛</button>
+            </div>
+
+            <div class="card" style="margin-top:10px">
+                <div id="statusBadge" class="status-badge bg-danger" role="status" aria-live="polite">受力分析中…</div>
+                <div id="warnBox" class="warn" hidden></div>
+
+                <div class="grid-data">
+                    <div class="data-card"><div class="label">外部空氣密度 ρ<sub>外</sub></div><div class="value" id="rhoOutVal">-</div></div>
+                    <div class="data-card"><div class="label">內部空氣密度 ρ<sub>內</sub></div><div class="value" id="rhoInVal">-</div></div>
+                    <div class="data-card"><div class="label">密度差 Δρ</div><div class="value" id="deltaRhoVal">-</div></div>
+                    <div class="data-card"><div class="label">浮力 F<sub>浮</sub></div><div class="value" id="buoyancyVal">-</div></div>
+                    <div class="data-card"><div class="label">球皮重力 G（材料質量 <span id="massVal">-</span>）</div><div class="value" id="gravityVal">-</div></div>
+                    <div class="data-card"><div class="label">淨升力 F<sub>淨</sub></div><div class="value" id="netForceVal">-</div></div>
+                    <div class="data-card key"><div class="label">最小棱長 a<sub>min</sub></div><div class="value" id="aminVal">-</div></div>
+                    <div class="data-card key"><div class="label">臨界內溫 T<sub>臨界</sub>（在當前 a）</div><div class="value" id="tcritVal">-</div></div>
+                    <div class="data-card key"><div class="label">起飛加速度（含球內空氣質量）</div><div class="value" id="accVal">-</div></div>
+                </div>
+
+                <div class="card chart-box" style="box-shadow:none;border:1px solid #edf2f7;padding:10px">
+                    <h2 style="font-size:13px">淨升力 F<sub>淨</sub> 隨球內溫度變化（其餘條件不變）</h2>
+                    <svg id="chart" viewBox="0 0 560 220" role="img" aria-label="淨升力隨球內溫度變化折線圖"></svg>
+                </div>
+
+                <div class="info-box">
+                    <strong>物理原理：</strong>
+                    <ul>
+                        <li><strong>阿基米德原理：</strong>F<sub>浮</sub> = ρ<sub>外</sub> · Vol · g。球內熱空氣本身也有重量 ρ<sub>內</sub> · Vol · g，所以真正推動氣球的是兩者之差：(ρ<sub>外</sub> − ρ<sub>內</sub>) · Vol · g。</li>
+                        <li><strong>理想氣體：</strong>常壓下 ρ ∝ 1/T（T 為絕對溫度，本模擬取 ρ = 353.15 / T）。球口開放，內外同壓，加熱使空氣膨脹溢出、密度下降。</li>
+                        <li><strong>升空條件：</strong>F<sub>淨</sub> = Δρ · Vol · g − σ · S · g &gt; 0。</li>
+                        <li><strong>推出最小棱長：</strong>令 k = Vol / (S·a)（只由形狀決定），則 Vol = k·S·a，不等式化為 <strong>a &gt; a<sub>min</sub> = σ / (Δρ · k)</strong>。</li>
+                    </ul>
+                </div>
+                <div class="info-box amber">
+                    <strong>模型假設（不計入）：</strong>黏貼邊與膠水的額外重量、球口開孔、載重、風、海拔氣壓變化、熱氣在球內的溫度分佈不均。實作時這些都會讓所需 a 比 a<sub>min</sub> 更大，所以 a<sub>min</sub> 是<strong>下限</strong>而非建議尺寸。
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2 -->
+        <div id="math" class="tab-content" role="tabpanel" aria-labelledby="tab-math">
+            <div class="card">
+                <h2>數學核心特點與定理驗證</h2>
+                <div class="grid-data">
+                    <div class="data-card"><div class="label">頂點數 N<sub>v</sub></div><div class="value" id="vertVal">-</div></div>
+                    <div class="data-card"><div class="label">棱數 E</div><div class="value" id="edgeCountVal">-</div></div>
+                    <div class="data-card"><div class="label">面數 F</div><div class="value" id="faceVal">-</div></div>
+                    <div class="data-card"><div class="label">表面積 S (m²)</div><div class="value" id="sVal">-</div></div>
+                    <div class="data-card"><div class="label">體積 Vol (m³)</div><div class="value" id="vVal">-</div></div>
+                    <div class="data-card"><div class="label">體面比 Vol / S</div><div class="value" id="ratioVal">-</div></div>
+                    <div class="data-card"><div class="label">形狀常數 k = Vol / (S·a)</div><div class="value" id="kVal">-</div></div>
+                    <div class="data-card"><div class="label">球度 ψ（同體積球的表面積 ÷ S）</div><div class="value" id="psiVal">-</div></div>
+                    <div class="data-card"><div class="label">公式與 3D 網格核對</div><div class="value" id="meshCheck">-</div></div>
+                </div>
+
+                <div class="info-box green">
+                    <strong>正多面體的數學性質：</strong>
+                    <ul>
+                        <li><strong>歐拉公式：</strong>N<sub>v</sub> − E + F = <span id="eulerVerify" style="font-weight:bold;color:#2b6cb0">-</span>（凸多面體恆為 2）。此處的 N<sub>v</sub>、E、F 是程式從 3D 頂點座標實際數出來的，不是手填的。</li>
+                        <li><strong>對偶性：</strong>當前立體的對偶為 <strong id="dualityVal" style="color:#b7791f">-</strong>（連接各面中心得到對偶多面體；F 與 N<sub>v</sub> 互換，E 不變）。</li>
+                        <li><strong>全等與對稱：</strong>各面為全等的正多邊形，每個頂點匯聚的面數相同。</li>
+                        <li><strong>體面比：</strong>Vol ∝ a³、S ∝ a²，所以 Vol/S = k·a，<strong>與棱長 a 成正比</strong>。同樣棱長下，各立體的 k 不同（見「對照」頁），<strong>面數多不一定 k 大</strong>：例如正六面體 (k≈0.167) 就比正八面體 (k≈0.136) 大。</li>
+                        <li><strong>要比較「像不像球」</strong>，應在<strong>同體積</strong>下比表面積，即球度 ψ = π<sup>1/3</sup>(6Vol)<sup>2/3</sup> / S。面數越多 ψ 越接近 1：四面體 0.67 &lt; 六面體 0.81 &lt; 八面體 0.85 &lt; 十二面體 0.91 &lt; 二十面體 0.94。</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 3 -->
+        <div id="table" class="tab-content" role="tabpanel" aria-labelledby="tab-table">
+            <div class="card">
+                <h2>柏拉圖立體（5 種正多面體）數學參數</h2>
+                <div class="table-wrap">
+                <table class="poly-table" id="mathTable">
+                    <thead><tr>
+                        <th>名稱</th><th>單面形狀</th><th>面數 F</th><th>頂點數 N<sub>v</sub></th><th>棱數 E</th>
+                        <th>N<sub>v</sub> − E + F</th><th>表面積 S</th><th>體積 Vol</th><th>k = Vol/(S·a)</th><th>球度 ψ</th><th>對偶</th>
+                    </tr></thead>
+                    <tbody></tbody>
+                </table>
+                </div>
+            </div>
+            <div class="card">
+                <h2>同一條件下的比較（使用左側目前的 σ、內溫、室溫與棱長 a）</h2>
+                <div class="table-wrap">
+                <table class="poly-table" id="cmpTable">
+                    <thead><tr>
+                        <th>名稱</th><th>k</th><th>最小棱長 a<sub>min</sub> (m)</th><th>材料面積 @a<sub>min</sub> (m²)</th>
+                        <th>材料面積 @當前 a (m²)</th><th>F<sub>淨</sub> @當前 a (N)</th><th>能否升空</th>
+                    </tr></thead>
+                    <tbody></tbody>
+                </table>
+                </div>
+                <div class="info-box" style="margin-top:12px">
+                    <strong>探究問題：</strong>
+                    <ul>
+                        <li>k 越大，a<sub>min</sub> 越小。哪一種立體的 a<sub>min</sub> 最小？它是不是也最省材料（看「材料面積 @a<sub>min</sub>」那一欄）？</li>
+                        <li>S<sub>min</sub> = (S/a²) · a<sub>min</sub>²，而 a<sub>min</sub> ∝ 1/k，所以 S<sub>min</sub> ∝ (S/a²)/k²。試自行推導，並解釋為什麼「最接近球」未必代表「最省料」。</li>
+                        <li>選擇立體時，除了材料面積，還有哪些製作因素（面數、黏貼邊數、拼接難度、對稱性）？請到「2D 展開圖」頁數一數各立體的黏貼邊數。</li>
+                        <li>把內溫降到臨界值附近，a<sub>min</sub> 會怎樣變化？為什麼溫差一小，所需氣球就急遽變大？</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 4 -->
+        <div id="net2d" class="tab-content" role="tabpanel" aria-labelledby="tab-net2d">
+            <div class="card">
+                <div class="net-toolbar">
+                    <label for="printMode" style="font-size:12px;font-weight:600">列印方式：</label>
+                    <select id="printMode">
+                        <option value="fit">縮放至單頁 A4（比例見下方）</option>
+                        <option value="tile">1:1 實際大小，分頁拼貼</option>
+                    </select>
+                    <button class="btn primary" id="printBtn" type="button">🖨️ 列印 / 存成 PDF</button>
+                </div>
+                <div class="info-box" id="netInfo">-</div>
+                <div class="svg-container"><svg id="netSvg" role="img" aria-label="正多面體 2D 展開圖"></svg></div>
+                <div class="hint" style="margin-top:8px;line-height:1.7">
+                    <strong>圖例：</strong>黑色實線＝面的邊界與折痕；<strong>灰色虛線梯形＝黏貼邊（塗膠水）</strong>；
+                    <strong style="color:#1d4ed8">藍色數字＝配對編號</strong>——兩條<u>相同編號</u>的邊要黏在一起（有梯形的那條貼到沒梯形的那條）。
+                    黏貼邊數 = E − (F − 1)。
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="printArea"></div>
+
+<script>
+'use strict';
+
+/* =====================================================================
+   1. 幾何資料：由頂點座標自動推出面、棱，並驗證公式
+   ===================================================================== */
+const PHI = (1 + Math.sqrt(5)) / 2;
+const P0 = 353.15;      // ρ = P0 / T（常壓下空氣，kg·K/m³）
+const G_ACC = 9.8;
+
+const SPECS = {
+    tetrahedron:  {name:'正四面體',   faceName:'正三角形', dual:'tetrahedron',  sCoef:Math.sqrt(3),               vCoef:Math.sqrt(2)/12,                 sText:'√3 · a²',               vText:'(√2/12) · a³',
+                   verts:()=>[[1,1,1],[1,-1,-1],[-1,1,-1],[-1,-1,1]]},
+    cube:         {name:'正六面體',   faceName:'正方形',   dual:'octahedron',   sCoef:6,                          vCoef:1,                               sText:'6 · a²',                vText:'a³',
+                   verts:()=>{const v=[];for(const x of[-1,1])for(const y of[-1,1])for(const z of[-1,1])v.push([x,y,z]);return v;}},
+    octahedron:   {name:'正八面體',   faceName:'正三角形', dual:'cube',         sCoef:2*Math.sqrt(3),             vCoef:Math.sqrt(2)/3,                  sText:'2√3 · a²',              vText:'(√2/3) · a³',
+                   verts:()=>[[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]]},
+    dodecahedron: {name:'正十二面體', faceName:'正五邊形', dual:'icosahedron',  sCoef:3*Math.sqrt(25+10*Math.sqrt(5)), vCoef:(15+7*Math.sqrt(5))/4,     sText:'3√(25+10√5) · a²',      vText:'[(15+7√5)/4] · a³',
+                   verts:()=>{const v=[];for(const x of[-1,1])for(const y of[-1,1])for(const z of[-1,1])v.push([x,y,z]);
+                              const i=1/PHI;for(const s1 of[-1,1])for(const s2 of[-1,1])v.push([0,s1*i,s2*PHI],[s1*i,s2*PHI,0],[s2*PHI,0,s1*i]);return v;}},
+    icosahedron:  {name:'正二十面體', faceName:'正三角形', dual:'dodecahedron', sCoef:5*Math.sqrt(3),             vCoef:5*(3+Math.sqrt(5))/12,          sText:'5√3 · a²',              vText:'[5(3+√5)/12] · a³',
+                   verts:()=>{const v=[];for(const s1 of[-1,1])for(const s2 of[-1,1])v.push([0,s1,s2*PHI],[s1,s2*PHI,0],[s2*PHI,0,s1]);return v;}}
+};
+const ORDER = ['tetrahedron','cube','octahedron','dodecahedron','icosahedron'];
+
+const sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]];
+const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+const norm=a=>Math.sqrt(dot(a,a));
+const unit=a=>{const n=norm(a);return [a[0]/n,a[1]/n,a[2]/n]};
+
+const POLY_CACHE = {};
+function getPoly(key){
+    if (POLY_CACHE[key]) return POLY_CACHE[key];
+    const spec = SPECS[key];
+    let V = spec.verts();
+    // 縮放成棱長 = 1
+    let el = Infinity;
+    for (let i=0;i<V.length;i++) for (let j=i+1;j<V.length;j++) el=Math.min(el,norm(sub(V[i],V[j])));
+    V = V.map(p=>[p[0]/el,p[1]/el,p[2]/el]);
+
+    // 找出所有「支撐平面」上的面
+    const faceMap = new Map();
+    for (let i=0;i<V.length;i++) for (let j=i+1;j<V.length;j++) for (let k=j+1;k<V.length;k++){
+        let n = cross(sub(V[j],V[i]),sub(V[k],V[i]));
+        if (norm(n)<1e-9) continue;
+        n = unit(n);
+        let d = dot(n,V[i]);
+        if (d<0){ n=[-n[0],-n[1],-n[2]]; d=-d; }          // 法向量朝外（中心在原點）
+        let pos=0, on=[];
+        for (let m=0;m<V.length;m++){
+            const t = dot(n,V[m])-d;
+            if (Math.abs(t)<1e-6) on.push(m); else if (t>0) pos++;
+        }
+        if (pos>0) continue;                                // 還有點在平面外側 → 不是面
+        const kstr = on.slice().sort((x,y)=>x-y).join(',');
+        if (faceMap.has(kstr)) continue;
+        // 依逆時針（從外側看）排序
+        const c=[0,0,0]; on.forEach(m=>{c[0]+=V[m][0];c[1]+=V[m][1];c[2]+=V[m][2]});
+        c[0]/=on.length;c[1]/=on.length;c[2]/=on.length;
+        const u=unit(sub(V[on[0]],c)), w=cross(n,u);
+        on.sort((p,q)=>{
+            const ap=Math.atan2(dot(sub(V[p],c),w),dot(sub(V[p],c),u));
+            const aq=Math.atan2(dot(sub(V[q],c),w),dot(sub(V[q],c),u));
+            return ap-aq;
+        });
+        faceMap.set(kstr,on);
+    }
+    const faces = [...faceMap.values()];
+
+    // 棱與面鄰接
+    const emap = new Map();
+    faces.forEach((f,fi)=>{
+        for (let i=0;i<f.length;i++){
+            const a=f[i], b=f[(i+1)%f.length];
+            const kk = Math.min(a,b)+'-'+Math.max(a,b);
+            if(!emap.has(kk)) emap.set(kk,{a:Math.min(a,b),b:Math.max(a,b),f:[]});
+            emap.get(kk).f.push(fi);
+        }
+    });
+    const edges=[...emap.values()];
+
+    // 數值驗證：由網格算 S、Vol，對照公式
+    let S=0, Vol=0;
+    faces.forEach(f=>{
+        for (let i=1;i<f.length-1;i++){
+            const A=V[f[0]],B=V[f[i]],C=V[f[i+1]];
+            S += norm(cross(sub(B,A),sub(C,A)))/2;
+            Vol += dot(A,cross(B,C))/6;
+        }
+    });
+    const meshOK = Math.abs(S-spec.sCoef)<1e-6 && Math.abs(Vol-spec.vCoef)<1e-6;
+
+    let minY = Infinity; V.forEach(p=>{minY=Math.min(minY,p[1])});
+
+    return POLY_CACHE[key] = {key, spec, verts:V, faces, edges, Nv:V.length, E:edges.length, F:faces.length, meshS:S, meshVol:Vol, meshOK, minY};
+}
+
+function shapeConstants(spec){
+    const k = spec.vCoef/spec.sCoef;                                         // Vol/(S·a)
+    const psi = Math.pow(Math.PI,1/3)*Math.pow(6*spec.vCoef,2/3)/spec.sCoef;  // 球度
+    return {k, psi};
+}
+
+/* =====================================================================
+   2. 物理計算（單一入口，面板／表格／3D 都用它）
+   ===================================================================== */
+function physics(spec, a, gsm, Tin, Tout){
+    const S = spec.sCoef*a*a, Vol = spec.vCoef*a*a*a;
+    const {k} = shapeConstants(spec);
+    const sigma = gsm/1000;                       // kg/m²
+    const rhoOut = P0/(Tout+273.15), rhoIn = P0/(Tin+273.15);
+    const dRhoRaw = rhoOut-rhoIn;
+    const valid = dRhoRaw>0;
+    const dRho = valid?dRhoRaw:0;
+    const mass = S*sigma, G = mass*G_ACC;
+    const Fb = dRho*Vol*G_ACC, Fnet = Fb-G;
+    const aMin = valid ? sigma/(dRho*k) : Infinity;
+    const dNeed = sigma/(k*a);                    // 在此 a 所需的最小 Δρ
+    const inv = 1/(Tout+273.15) - dNeed/P0;
+    const Tcrit = inv>0 ? 1/inv-273.15 : Infinity;
+    const mTot = mass + rhoIn*Vol;                 // 球皮 + 球內空氣
+    return {S,Vol,k,sigma,rhoOut,rhoIn,dRhoRaw,dRho,valid,mass,G,Fb,Fnet,aMin,Tcrit,mTot,acc:Fnet/mTot};
+}
+
+/* =====================================================================
+   3. 展開圖：隨機生成樹 + 重疊檢測，挑出不重疊的網
+   ===================================================================== */
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+
+function buildRegularPolygon(n,p0,p1){
+    const pts=[p0,p1], turn=2*Math.PI/n;
+    let a=p0,b=p1;
+    for(let i=2;i<n;i++){
+        const vx=b[0]-a[0], vy=b[1]-a[1];
+        const nx=b[0]+vx*Math.cos(turn)-vy*Math.sin(turn);
+        const ny=b[1]+vx*Math.sin(turn)+vy*Math.cos(turn);
+        pts.push([nx,ny]); a=b; b=[nx,ny];
+    }
+    return pts;
+}
+function centroid2(p){let x=0,y=0;p.forEach(q=>{x+=q[0];y+=q[1]});return [x/p.length,y/p.length]}
+function shrink2(p,f){const c=centroid2(p);return p.map(q=>[c[0]+(q[0]-c[0])*f,c[1]+(q[1]-c[1])*f])}
+function overlap2(A,B){
+    for (const P of [A,B]){
+        for (let i=0;i<P.length;i++){
+            const q=P[(i+1)%P.length];
+            const nx=-(q[1]-P[i][1]), ny=q[0]-P[i][0];
+            let a0=Infinity,a1=-Infinity,b0=Infinity,b1=-Infinity;
+            for(const p of A){const t=p[0]*nx+p[1]*ny;if(t<a0)a0=t;if(t>a1)a1=t}
+            for(const p of B){const t=p[0]*nx+p[1]*ny;if(t<b0)b0=t;if(t>b1)b1=t}
+            if (a1<=b0+1e-9 || b1<=a0+1e-9) return false;
+        }
+    }
+    return true;
+}
+function flapPoly(p,q,d=0.12,ind=0.12){
+    const dx=q[0]-p[0], dy=q[1]-p[1], len=Math.hypot(dx,dy);
+    const ux=dx/len, uy=dy/len, nx=uy, ny=-ux;        // 面為逆時針 → 外側在行進方向右手邊
+    return [p,[p[0]+ux*ind+nx*d,p[1]+uy*ind+ny*d],[q[0]-ux*ind+nx*d,q[1]-uy*ind+ny*d],q];
+}
+function bboxOf(polys){
+    let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
+    polys.forEach(P=>P.forEach(p=>{x0=Math.min(x0,p[0]);y0=Math.min(y0,p[1]);x1=Math.max(x1,p[0]);y1=Math.max(y1,p[1])}));
+    return {x0,y0,x1,y1,w:x1-x0,h:y1-y0};
+}
+
+function evaluateTree(poly, rnd, bestScore){
+    const F=poly.F, edges=poly.edges;
+    const order=edges.map((_,i)=>i);
+    for(let i=order.length-1;i>0;i--){const j=Math.floor(rnd()*(i+1));[order[i],order[j]]=[order[j],order[i]];}
+    const uf=Array.from({length:F},(_,i)=>i);
+    const find=x=>{while(uf[x]!==x){uf[x]=uf[uf[x]];x=uf[x]}return x};
+    const inTree=new Array(edges.length).fill(false);
+    const adj=Array.from({length:F},()=>[]);
+    for(const ei of order){
+        const [f1,f2]=edges[ei].f, r1=find(f1), r2=find(f2);
+        if(r1!==r2){uf[r1]=r2;inTree[ei]=true;adj[f1].push([f2,ei]);adj[f2].push([f1,ei]);}
+    }
+    const root=Math.floor(rnd()*F);
+    const pts=new Array(F);
+    pts[root]=buildRegularPolygon(poly.faces[root].length,[0,0],[1,0]);
+    const queue=[root];
+    while(queue.length){
+        const f=queue.shift(), Lf=poly.faces[f], n=Lf.length;
+        for(const [g,ei] of adj[f]){
+            if(pts[g]) continue;
+            const e=edges[ei];
+            let j=-1;
+            for(let t=0;t<n;t++){const x=Lf[t],y=Lf[(t+1)%n]; if((x===e.a&&y===e.b)||(x===e.b&&y===e.a)){j=t;break;}}
+            const v=Lf[(j+1)%n], u=Lf[j];
+            const U=pts[f][j], V=pts[f][(j+1)%n];
+            const Lg=poly.faces[g], m=Lg.length;
+            let i0=-1;
+            for(let t=0;t<m;t++){ if(Lg[t]===v && Lg[(t+1)%m]===u){i0=t;break;} }
+            const raw=buildRegularPolygon(m,V,U), out=new Array(m);
+            for(let t=0;t<m;t++) out[(i0+t)%m]=raw[t];
+            pts[g]=out; queue.push(g);
+        }
+    }
+    // 面重疊
+    const shr=pts.map(p=>shrink2(p,0.96));
+    let overlaps=0;
+    for(let i=0;i<F;i++)for(let j=i+1;j<F;j++) if(overlap2(shr[i],shr[j])) overlaps++;
+    if (overlaps>0) return {overlaps, flapConflicts:0, score:1e6*overlaps};
+    { const b0=bboxOf(pts); if (b0.w*b0.h>=bestScore) return {overlaps:0, flapConflicts:0, score:Infinity}; }   // 已不可能勝出，略過黏貼邊計算
+
+    // 黏貼邊
+    const cuts=[], placed=[]; let flapConflicts=0;
+    edges.forEach((e,ei)=>{
+        if(inTree[ei]) return;
+        const info=[0,1].map(s=>{
+            const f=e.f[s], Lf=poly.faces[f], n=Lf.length;
+            let j=-1; for(let t=0;t<n;t++){const x=Lf[t],y=Lf[(t+1)%n]; if((x===e.a&&y===e.b)||(x===e.b&&y===e.a)){j=t;break;}}
+            const p=pts[f][j], q=pts[f][(j+1)%n];
+            const fl=flapPoly(p,q), fs=shrink2(fl,0.85);
+            let c=0;
+            for(let g=0;g<F;g++) if(g!==f && overlap2(fs,shr[g])) c++;
+            for(const o of placed) if(overlap2(fs,o)) c++;
+            return {f,j,p,q,fl,fs,c};
+        });
+        const pick = info[1].c<info[0].c?1:0;
+        flapConflicts += info[pick].c;
+        placed.push(info[pick].fs);
+        cuts.push({id:cuts.length+1, copies:info, flapSide:pick});
+    });
+    const bb=bboxOf([...pts, ...cuts.map(c=>c.copies[c.flapSide].fl)]);
+    return {pts, cuts, overlaps:0, flapConflicts, bb, score:6*flapConflicts+bb.w*bb.h};
+}
+
+const NET_CACHE={};
+function getNet(key){
+    if(NET_CACHE[key]) return NET_CACHE[key];
+    const poly=getPoly(key), rnd=mulberry32(20241010);
+    const trials = poly.F<=8?300:2000;
+    let best=null;
+    for(let t=0;t<trials;t++){
+        const r=evaluateTree(poly,rnd,best?best.score:Infinity);
+        if(r.pts && (!best || r.score<best.score)) best=r;
+    }
+    best.poly=poly;
+    best.nFlaps=best.cuts?best.cuts.length:0;
+    return NET_CACHE[key]=best;
+}
+
+/* ---- 將 net 轉成實際尺寸（mm）幾何，供螢幕與列印共用 ---- */
+function netGeometry(net,u,rot){
+    const T=p=>{const x=p[0]*u,y=-p[1]*u;return rot?[y,-x]:[x,y]};
+    const faces=net.pts.map(P=>P.map(T));
+    const flaps=net.cuts.map(c=>c.copies[c.flapSide].fl.map(T));
+    const labels=[];
+    net.cuts.forEach(c=>{
+        c.copies.forEach(cp=>{
+            const dx=cp.q[0]-cp.p[0], dy=cp.q[1]-cp.p[1], L=Math.hypot(dx,dy);
+            const mx=(cp.p[0]+cp.q[0])/2, my=(cp.p[1]+cp.q[1])/2;
+            const nx=-dy/L, ny=dx/L;                        // 面內側（左手邊）
+            const off=Math.min(0.22, 0.5*(1/(2*Math.tan(Math.PI/net.poly.faces[cp.f].length))));
+            const pos=T([mx+nx*off,my+ny*off]);
+            labels.push({x:pos[0],y:pos[1],t:String(c.id)});
+        });
+    });
+    const bb=bboxOf([...faces,...flaps]);
+    return {faces,flaps,labels,bb,rot};
+}
+
+function svgEl(tag,attrs,parent){const e=document.createElementNS('http://www.w3.org/2000/svg',tag);for(const k in attrs)e.setAttribute(k,attrs[k]);if(parent)parent.appendChild(e);return e}
+const pstr=P=>P.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
+function fmtLen(mm){return mm>=1000?(mm/1000)+' m':(mm/10)+' cm'}
+
+/* 畫到 svg 上；view = {x,y,w,h}；回傳 */
+function renderNet(svg,geom,view,fontMM,barMM,barNote){
+    svg.innerHTML='';
+    svg.setAttribute('viewBox',`${view.x} ${view.y} ${view.w} ${view.h}`);
+    svg.setAttribute('preserveAspectRatio','xMidYMid meet');
+    const gF=svgEl('g',{fill:'rgba(231,76,60,0.07)',stroke:'#111','stroke-width':1.6,'stroke-linejoin':'round'},svg);
+    const gL=svgEl('g',{fill:'rgba(120,120,120,0.10)',stroke:'#555','stroke-width':1.1,'stroke-dasharray':'5,3'},svg);
+    geom.flaps.forEach(P=>svgEl('polygon',{points:pstr(P),'vector-effect':'non-scaling-stroke'},gL));
+    geom.faces.forEach(P=>svgEl('polygon',{points:pstr(P),'vector-effect':'non-scaling-stroke'},gF));
+    const gT=svgEl('g',{'font-size':fontMM,'font-weight':'bold',fill:'#1d4ed8','text-anchor':'middle','dominant-baseline':'central','paint-order':'stroke',stroke:'#fff','stroke-width':fontMM*0.25},svg);
+    geom.labels.forEach(l=>{const t=svgEl('text',{x:l.x.toFixed(1),y:l.y.toFixed(1)},gT);t.textContent=l.t;});
+    // 比例尺 / 校準尺
+    const bx=geom.bb.x0, by=geom.bb.y1+fontMM*2.2;
+    const gB=svgEl('g',{stroke:'#111','stroke-width':1.6,fill:'#111'},svg);
+    svgEl('line',{x1:bx,y1:by,x2:bx+barMM,y2:by,'vector-effect':'non-scaling-stroke'},gB);
+    svgEl('line',{x1:bx,y1:by-fontMM*0.5,x2:bx,y2:by+fontMM*0.5,'vector-effect':'non-scaling-stroke'},gB);
+    svgEl('line',{x1:bx+barMM,y1:by-fontMM*0.5,x2:bx+barMM,y2:by+fontMM*0.5,'vector-effect':'non-scaling-stroke'},gB);
+    const tt=svgEl('text',{x:bx+barMM+fontMM*0.6,y:by,'font-size':fontMM,'dominant-baseline':'central',stroke:'none'},gB);
+    tt.textContent=fmtLen(barMM)+(barNote||'');
+}
+
+function niceBar(wMM){
+    const list=[50,100,200,500,1000,2000,5000];
+    let best=list[0]; for(const v of list) if(v<=wMM*0.3) best=v; return best;
+}
+
+/* ===== 螢幕上的展開圖 ===== */
+let netDirty=true;
+function drawNetScreen(){
+    const key=cur.shape, net=getNet(key), a=cur.a, u=a*1000;
+    const geom=netGeometry(net,u,false);
+    const font=Math.max(geom.bb.w,geom.bb.h)/55;
+    const pad=font*2;
+    const view={x:geom.bb.x0-pad,y:geom.bb.y0-pad,w:geom.bb.w+pad*2,h:geom.bb.h+pad*2+font*4};
+    renderNet(document.getElementById('netSvg'),geom,view,font,niceBar(geom.bb.w),'');
+    const poly=net.poly, spec=poly.spec;
+    const ti=tileInfo(geom);
+    document.getElementById('netInfo').innerHTML =
+        `<strong>${spec.name}</strong>　棱長 a = ${a.toFixed(2)} m　展開圖外框約 ${(geom.bb.w/1000).toFixed(2)} × ${(geom.bb.h/1000).toFixed(2)} m　`+
+        `表面積 S = ${(spec.sCoef*a*a).toFixed(2)} m²<br>`+
+        `黏貼邊數 = E − (F − 1) = ${poly.E} − ${poly.F-1} = <strong>${net.nFlaps}</strong>（圖中共 ${net.nFlaps} 組配對編號）　`+
+        `<span class="${net.overlaps===0?'ok':'no'}">面重疊檢查：${net.overlaps===0?'通過 ✓':'有 '+net.overlaps+' 處重疊 ✗'}</span>　`+
+        `<span class="${net.flapConflicts===0?'ok':'no'}">黏貼邊與其他面衝突：${net.flapConflicts} 處</span><br>`+
+        `<span style="color:#4a5568">1:1 列印需約 ${ti.count} 張 A4（${ti.cols} 欄 × ${ti.rows} 列）；縮放至單頁則比例約 1 : ${ti.fitN.toFixed(1)}。</span>`;
+}
+
+/* ===== 列印 ===== */
+const TILE_W=190, TILE_H=255;
+function tileInfo(geom){
+    const polys=[...geom.faces,...geom.flaps].map(bboxOf1);
+    const cols=Math.max(1,Math.ceil(geom.bb.w/TILE_W)), rows=Math.max(1,Math.ceil(geom.bb.h/TILE_H));
+    let count=0;
+    for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
+        const x0=geom.bb.x0+c*TILE_W, y0=geom.bb.y0+r*TILE_H;
+        if(polys.some(b=>b.x1>x0&&b.x0<x0+TILE_W&&b.y1>y0&&b.y0<y0+TILE_H)) count++;
+    }
+    const s=Math.max(Math.min(TILE_W/geom.bb.w,TILE_H/(geom.bb.h+ (geom.bb.h*0.08))), Math.min(TILE_W/geom.bb.h,TILE_H/geom.bb.w));
+    return {cols,rows,count,fitN:1/Math.min(1,s)};
+}
+function bboxOf1(P){return bboxOf([P])}
+
+function buildPrintArea(mode){
+    const pa=document.getElementById('printArea'); pa.innerHTML='';
+    const net=getNet(cur.shape), spec=net.poly.spec, a=cur.a, u=a*1000;
+    const title=`${spec.name}熱氣球 2D 展開圖`;
+    const sub=`棱長 a = ${a.toFixed(2)} m｜S = ${(spec.sCoef*a*a).toFixed(2)} m²｜黏貼邊 ${net.nFlaps} 組（相同編號互相黏貼，有梯形的邊貼到無梯形的邊）`;
+    function page(headExtra){
+        const sec=document.createElement('section'); sec.className='print-page';
+        sec.innerHTML=`<div class="pp-head"><b>${title}</b><br>${sub}${headExtra?'<br>'+headExtra:''}</div>`;
+        const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+        sec.appendChild(svg); pa.appendChild(sec); return svg;
+    }
+    if(mode==='fit'){
+        const g0=netGeometry(net,u,false), g1=netGeometry(net,u,true);
+        const sc=g=>Math.min(TILE_W/g.bb.w,TILE_H/(g.bb.h*1.1));
+        const geom=sc(g1)>sc(g0)?g1:g0;
+        const font=Math.max(geom.bb.w,geom.bb.h)/60, pad=font*2;
+        const view={x:geom.bb.x0-pad,y:geom.bb.y0-pad,w:geom.bb.w+pad*2,h:geom.bb.h+pad*2+font*4};
+        const s=Math.min(TILE_W/view.w,TILE_H/view.h);
+        const svg=page(`縮放列印，約 1 : ${(1/Math.min(1,s)).toFixed(1)}（以下方比例尺為準）`);
+        renderNet(svg,geom,view,font,niceBar(geom.bb.w),'');
+    } else {
+        const geom=netGeometry(net,u,false), cols=Math.max(1,Math.ceil(geom.bb.w/TILE_W)), rows=Math.max(1,Math.ceil((geom.bb.h+14)/TILE_H));
+        const polys=[...geom.faces,...geom.flaps].map(bboxOf1);
+        let total=0; const list=[];
+        for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
+            const x0=geom.bb.x0+c*TILE_W, y0=geom.bb.y0+r*TILE_H;
+            if(polys.some(b=>b.x1>x0&&b.x0<x0+TILE_W&&b.y1>y0&&b.y0<y0+TILE_H)||(r===rows-1&&c===0)) list.push([r,c,x0,y0]);
+        }
+        list.forEach(([r,c,x0,y0])=>{
+            const svg=page(`1:1 拼貼：第 ${r+1} 列 第 ${c+1} 欄（共 ${rows} 列 × ${cols} 欄）— 列印時請選「實際大小／100%」，並用下方 10 cm 校準尺核對`);
+            renderNet(svg,geom,{x:x0,y:y0,w:TILE_W,h:TILE_H},9,100,'（校準尺）');
+            svgEl('rect',{x:x0+0.5,y:y0+0.5,width:TILE_W-1,height:TILE_H-1,fill:'none',stroke:'#aaa','stroke-width':1,'stroke-dasharray':'2,3','vector-effect':'non-scaling-stroke'},svg);
+        });
+    }
+}
+window.addEventListener('beforeprint',()=>{
+    if(activeTab==='net2d'){buildPrintArea(document.getElementById('printMode').value);document.body.classList.add('printing');}
+});
+window.addEventListener('afterprint',()=>{document.body.classList.remove('printing');document.getElementById('printArea').innerHTML='';});
+
+/* =====================================================================
+   4. 3D 場景（只在換形狀時重建幾何；改棱長只改 scale）
+   ===================================================================== */
+let scene,camera,renderer,controls,balloon,solidMesh,edgeLines,solidMat,glOK=false;
+let meshShape=null;
+const sim={y:0,vy:0,restY:0,Fnet:0,mass:1,ceil:6};
+
+function init3D(){
+    const box=document.getElementById('webglCanvas');
+    if(typeof THREE==='undefined'){box.innerHTML='<div class="nogl">⚠ 無法載入 Three.js（可能是網路限制）。3D 動畫不可用，但數據、圖表與展開圖仍可使用。</div>';return;}
+    try{ renderer=new THREE.WebGLRenderer({antialias:true}); }
+    catch(e){ box.innerHTML='<div class="nogl">⚠ 此瀏覽器或裝置不支援 WebGL，3D 動畫不可用，但數據、圖表與展開圖仍可使用。</div>'; return; }
+    glOK=true;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+    box.appendChild(renderer.domElement);
+
+    scene=new THREE.Scene(); scene.background=new THREE.Color(0x87ceeb);
+    camera=new THREE.PerspectiveCamera(45,1,0.1,200);
+    camera.position.set(0,3.5,10);
+    if(THREE.OrbitControls){
+        controls=new THREE.OrbitControls(camera,renderer.domElement);
+        controls.target.set(0,2.6,0); controls.enableDamping=true; controls.update();
+    }
+    scene.add(new THREE.AmbientLight(0xffffff,0.7));
+    const dl=new THREE.DirectionalLight(0xffffff,0.8); dl.position.set(5,12,6); scene.add(dl);
+    const ground=new THREE.Mesh(new THREE.PlaneGeometry(60,60),new THREE.MeshLambertMaterial({color:0x4cc07f}));
+    ground.rotation.x=-Math.PI/2; scene.add(ground);
+    const grid=new THREE.GridHelper(60,30,0x3fae6e,0x3fae6e); grid.position.y=0.01; scene.add(grid);
+
+    balloon=new THREE.Group(); scene.add(balloon);
+    solidMat=new THREE.MeshPhongMaterial({color:0x7f8c8d,transparent:true,opacity:0.88,side:THREE.DoubleSide,flatShading:true,polygonOffset:true,polygonOffsetFactor:1,polygonOffsetUnits:1});
+
+    if(typeof ResizeObserver!=='undefined') new ResizeObserver(resize3D).observe(box); else window.addEventListener('resize',resize3D);
+    resize3D();
+}
+function resize3D(){
+    if(!glOK) return;
+    const box=document.getElementById('webglCanvas');
+    const w=box.clientWidth, h=box.clientHeight; if(!w||!h) return;
+    renderer.setSize(w,h); camera.aspect=w/h; camera.updateProjectionMatrix();
+}
+function setMeshShape(key){
+    if(!glOK||meshShape===key) return;
+    if(solidMesh){balloon.remove(solidMesh); solidMesh.geometry.dispose();}
+    if(edgeLines){balloon.remove(edgeLines); edgeLines.geometry.dispose(); edgeLines.material.dispose();}
+    const poly=getPoly(key), V=poly.verts, pos=[];
+    poly.faces.forEach(f=>{for(let i=1;i<f.length-1;i++)for(const idx of [f[0],f[i],f[i+1]])pos.push(V[idx][0],V[idx][1],V[idx][2]);});
+    const geo=new THREE.BufferGeometry();
+    geo.setAttribute('position',new THREE.Float32BufferAttribute(pos,3)); geo.computeVertexNormals();
+    solidMesh=new THREE.Mesh(geo,solidMat); balloon.add(solidMesh);
+    const lp=[]; poly.edges.forEach(e=>{lp.push(...V[e.a],...V[e.b]);});
+    const lg=new THREE.BufferGeometry(); lg.setAttribute('position',new THREE.Float32BufferAttribute(lp,3));
+    edgeLines=new THREE.LineSegments(lg,new THREE.LineBasicMaterial({color:0xffffff})); balloon.add(edgeLines);
+    meshShape=key;
+}
+function relaunch(){sim.y=sim.restY;sim.vy=0;}
+function stepSim(dt){
+    const lift=sim.Fnet/sim.mass, top=sim.restY+sim.ceil;
+    if(sim.y<=sim.restY+1e-4 && lift<=0){sim.y=sim.restY;sim.vy=0;return;}
+    sim.vy+=(lift-0.4*sim.vy)*dt;               // 簡化：線性阻力 0.4 /s
+    sim.vy=Math.max(-3,sim.vy);
+    sim.y+=sim.vy*dt;
+    if(sim.y<=sim.restY){sim.y=sim.restY;sim.vy=Math.max(0,sim.vy);}
+    if(sim.y>=top){sim.y=top;sim.vy=Math.min(0,sim.vy);}
+}
+let lastT=0;
+function animate(t){
+    requestAnimationFrame(animate);
+    const dt=Math.min(0.05,((t||0)-lastT)/1000||0.016); lastT=t||0;
+    stepSim(dt);
+    if(glOK){
+        balloon.position.y=sim.y; balloon.rotation.y+=0.004;
+        if(controls) controls.update();
+        renderer.render(scene,camera);
+    }
+    document.getElementById('hud').innerHTML=`離地高度 ${(sim.y-sim.restY).toFixed(2)} m<br>垂直速度 ${sim.vy.toFixed(2)} m/s`;
+}
+
+/* =====================================================================
+   5. 介面更新
+   ===================================================================== */
+const $=id=>document.getElementById(id);
+const cur={shape:'dodecahedron',a:0.5,gsm:17,Tin:60,Tout:26};
+let activeTab='sim3d';
+const fmt=(x,d=3)=>isFinite(x)?x.toFixed(d):'—';
+
+function readInputs(){
+    cur.shape=$('shapeSelect').value; cur.a=parseFloat($('edgeLength').value);
+    cur.gsm=parseFloat($('paperGSM').value); cur.Tin=parseFloat($('tempIn').value); cur.Tout=parseFloat($('tempOut').value);
+}
+
+function updateAll(){
+    readInputs();
+    const poly=getPoly(cur.shape), spec=poly.spec, {k,psi}=shapeConstants(spec);
+    const ph=physics(spec,cur.a,cur.gsm,cur.Tin,cur.Tout);
+
+    $('edgeVal').textContent=cur.a.toFixed(2); $('gsmVal').textContent=cur.gsm;
+    $('tempInVal').textContent=cur.Tin; $('tempOutVal').textContent=cur.Tout;
+
+    // 棱長滑桿：標出 a_min（左紅右綠）
+    const sl=$('edgeLength'), mn=+sl.min, mx=+sl.max;
+    let p = !isFinite(ph.aMin)?100 : Math.min(100,Math.max(0,(ph.aMin-mn)/(mx-mn)*100));
+    sl.style.setProperty('--track',`linear-gradient(to right,#f5b7b1 0%,#f5b7b1 ${p}%,#a9dfbf ${p}%,#a9dfbf 100%)`);
+    $('aminHint').innerHTML = !ph.valid ? '球內溫度未高於室溫，沒有 a<sub>min</sub>。'
+        : `a<sub>min</sub> = σ / (Δρ·k) = <strong>${ph.aMin.toFixed(3)} m</strong>。滑桿<span style="color:#c0392b">紅色區</span>＝無法升空，<span style="color:#27ae60">綠色區</span>＝可升空`+
+          (ph.aMin>mx?'（全部都在紅區，請提高內溫或換較輕的材料）':ph.aMin<mn?'（全部在綠區）':'。');
+
+    // 物理面板
+    $('rhoOutVal').textContent=ph.rhoOut.toFixed(3)+' kg/m³';
+    $('rhoInVal').textContent=ph.rhoIn.toFixed(3)+' kg/m³';
+    $('deltaRhoVal').textContent=ph.dRhoRaw.toFixed(3)+' kg/m³';
+    $('buoyancyVal').textContent=ph.Fb.toFixed(3)+' N';
+    $('gravityVal').textContent=ph.G.toFixed(3)+' N';
+    $('massVal').textContent=(ph.mass*1000).toFixed(0)+' g';
+    $('netForceVal').textContent=ph.Fnet.toFixed(3)+' N';
+    $('aminVal').textContent=isFinite(ph.aMin)?ph.aMin.toFixed(3)+' m':'—';
+    $('tcritVal').textContent=isFinite(ph.Tcrit)?ph.Tcrit.toFixed(1)+' °C':'此棱長下無論多熱都飛不起來';
+    $('accVal').textContent=(ph.Fnet>0?'+':'')+ph.acc.toFixed(3)+' m/s²';
+
+    const warn=$('warnBox');
+    if(!ph.valid){warn.hidden=false;warn.textContent='⚠ 球內溫度未高於環境溫度，空氣密度差 ≤ 0，沒有浮力（F浮 以 0 計）。請提高「球內空氣溫度」。';}
+    else if(cur.Tin>90){warn.hidden=false;warn.textContent='⚠ 球內溫度超過 90°C：電吹風通常達不到，紙與一般膠水在高溫下也可能變形，請確認是否符合你的實驗條件。';}
+    else warn.hidden=true;
+
+    const badge=$('statusBadge');
+    if(ph.Fnet>0){badge.className='status-badge bg-success';badge.textContent=`🚀 可升空：棱長 ${cur.a.toFixed(2)} m > a_min（淨升力 ${ph.Fnet.toFixed(3)} N）`;}
+    else{badge.className='status-badge bg-danger';badge.textContent=ph.valid?`⚓ 無法升空：棱長 ${cur.a.toFixed(2)} m ≤ a_min = ${ph.aMin.toFixed(3)} m（淨升力 ${ph.Fnet.toFixed(3)} N）`:'⚓ 無法升空：沒有浮力';}
+
+    // 數學面板
+    $('faceVal').textContent=poly.F; $('vertVal').textContent=poly.Nv; $('edgeCountVal').textContent=poly.E;
+    $('eulerVerify').textContent=`${poly.Nv} − ${poly.E} + ${poly.F} = ${poly.Nv-poly.E+poly.F}`;
+    $('dualityVal').textContent=SPECS[spec.dual].name+(spec.dual===cur.shape?'（自對偶）':'');
+    $('sVal').textContent=ph.S.toFixed(3); $('vVal').textContent=ph.Vol.toFixed(3);
+    $('ratioVal').textContent=(ph.Vol/ph.S).toFixed(4)+' m';
+    $('kVal').textContent=k.toFixed(4); $('psiVal').textContent=psi.toFixed(3);
+    $('meshCheck').innerHTML=poly.meshOK?'<span class="ok">一致 ✓</span>':'<span class="no">不一致 ✗</span>';
+
+    updateTables(ph);
+    drawChart(spec,ph);
+
+    // 3D
+    if(glOK){
+        setMeshShape(cur.shape);
+        balloon.scale.setScalar(cur.a);
+        solidMat.color.setHex(ph.Fnet>0?0xe74c3c:0x7f8c8d);
+    }
+    sim.restY=-poly.minY*cur.a; if(sim.y<sim.restY) sim.y=sim.restY;
+    sim.Fnet=ph.Fnet; sim.mass=ph.mTot;
+
+    netDirty=true; if(activeTab==='net2d') {drawNetScreen(); netDirty=false;}
+}
+
+let tablesBuilt=false;
+function updateTables(ph){
+    const t1=document.querySelector('#mathTable tbody'), t2=document.querySelector('#cmpTable tbody');
+    if(!tablesBuilt){
+        t1.innerHTML=ORDER.map(k=>{
+            const p=getPoly(k), s=p.spec, c=shapeConstants(s);
+            return `<tr data-key="${k}"><td>${s.name}</td><td>${s.faceName}</td><td>${p.F}</td><td>${p.Nv}</td><td>${p.E}</td><td>${p.Nv-p.E+p.F}</td><td>${s.sText}</td><td>${s.vText}</td><td>${c.k.toFixed(4)}</td><td>${c.psi.toFixed(3)}</td><td>${SPECS[s.dual].name}${s.dual===k?'（自對偶）':''}</td></tr>`;
+        }).join('');
+        tablesBuilt=true;
+    }
+    t2.innerHTML=ORDER.map(k=>{
+        const s=SPECS[k], r=physics(s,cur.a,cur.gsm,cur.Tin,cur.Tout);
+        const smin=isFinite(r.aMin)?s.sCoef*r.aMin*r.aMin:Infinity;
+        return `<tr data-key="${k}"><td>${s.name}</td><td>${r.k.toFixed(4)}</td><td>${fmt(r.aMin)}</td><td>${fmt(smin,2)}</td><td>${r.S.toFixed(2)}</td><td>${r.Fnet.toFixed(3)}</td><td class="${r.Fnet>0?'ok':'no'}">${r.Fnet>0?'可以':'不行'}</td></tr>`;
+    }).join('');
+    document.querySelectorAll('table.poly-table tbody tr').forEach(tr=>tr.classList.toggle('highlight',tr.dataset.key===cur.shape));
+}
+
+function drawChart(spec,ph){
+    const svg=$('chart'); svg.innerHTML='';
+    const W=560,H=220,L=52,R=14,T=14,B=34, x0=cur.Tout, x1=130;
+    const F=Tin=>P0*(1/(cur.Tout+273.15)-1/(Tin+273.15))*ph.Vol*G_ACC-ph.G;
+    const ymin=Math.min(-ph.G,0)*1.08, ymaxRaw=F(x1), ymax=Math.max(ymaxRaw,ph.G*0.2)*1.08;
+    const X=t=>L+(t-x0)/(x1-x0)*(W-L-R), Y=v=>T+(ymax-v)/(ymax-ymin)*(H-T-B);
+    const ax=svgEl('g',{stroke:'#cbd5e0','stroke-width':1},svg);
+    svgEl('line',{x1:L,y1:H-B,x2:W-R,y2:H-B},ax); svgEl('line',{x1:L,y1:T,x2:L,y2:H-B},ax);
+    const step=20; for(let t=Math.ceil(x0/step)*step;t<=x1;t+=step){
+        svgEl('line',{x1:X(t),y1:H-B,x2:X(t),y2:H-B+4},ax);
+        const tx=svgEl('text',{x:X(t),y:H-B+16,'text-anchor':'middle'},svg); tx.textContent=t;
+    }
+    const yt=svgEl('text',{x:(L+W-R)/2,y:H-4,'text-anchor':'middle'},svg); yt.textContent='球內溫度 (°C)';
+    for(let i=0;i<=4;i++){const v=ymin+(ymax-ymin)*i/4;
+        svgEl('line',{x1:L-4,y1:Y(v),x2:L,y2:Y(v),stroke:'#cbd5e0'},svg);
+        const tx=svgEl('text',{x:L-7,y:Y(v)+4,'text-anchor':'end'},svg); tx.textContent=v.toFixed(2);}
+    const yl=svgEl('text',{x:12,y:(T+H-B)/2,'text-anchor':'middle',transform:`rotate(-90 12 ${(T+H-B)/2})`},svg); yl.textContent='F淨 (N)';
+    svgEl('line',{x1:L,y1:Y(0),x2:W-R,y2:Y(0),stroke:'#718096','stroke-width':1,'stroke-dasharray':'4,3'},svg);
+    let d=''; for(let i=0;i<=80;i++){const t=x0+(x1-x0)*i/80; d+=(i?'L':'M')+X(t).toFixed(1)+','+Y(F(t)).toFixed(1);}
+    svgEl('path',{d,fill:'none',stroke:'#2980b9','stroke-width':2.2},svg);
+    if(isFinite(ph.Tcrit)&&ph.Tcrit>=x0&&ph.Tcrit<=x1){
+        svgEl('line',{x1:X(ph.Tcrit),y1:T,x2:X(ph.Tcrit),y2:H-B,stroke:'#c0392b','stroke-width':1.2,'stroke-dasharray':'4,3'},svg);
+        const lb=svgEl('text',{x:X(ph.Tcrit)+4,y:T+10,style:'fill:#c0392b;font-weight:bold'},svg); lb.textContent=`臨界 ${ph.Tcrit.toFixed(1)}°C`;
+    }
+    if(cur.Tin>=x0) svgEl('circle',{cx:X(cur.Tin),cy:Y(F(cur.Tin)),r:5,fill:ph.Fnet>0?'#27ae60':'#c0392b',stroke:'#fff','stroke-width':1.5},svg);
+}
+
+/* ===== 分頁 ===== */
+function setTab(id,focus){
+    activeTab=id;
+    document.querySelectorAll('.tab-btn').forEach(b=>{const on=b.dataset.tab===id;b.setAttribute('aria-selected',on);b.tabIndex=on?0:-1;if(on&&focus)b.focus();});
+    document.querySelectorAll('.tab-content').forEach(c=>c.classList.toggle('active',c.id===id));
+    if(id==='net2d'&&netDirty){drawNetScreen();netDirty=false;}
+    if(id==='sim3d') resize3D();
+}
+
+/* ===== 預設 ===== */
+function setInputs(o){
+    if(o.shape) $('shapeSelect').value=o.shape;
+    if(o.a!=null) $('edgeLength').value=o.a;
+    if(o.gsm!=null) $('paperGSM').value=o.gsm;
+    if(o.Tin!=null) $('tempIn').value=o.Tin;
+    if(o.Tout!=null) $('tempOut').value=o.Tout;
+    updateAll(); relaunch();
+}
+
+/* ===== 啟動 ===== */
+window.addEventListener('DOMContentLoaded',()=>{
+    ['shapeSelect','edgeLength','paperGSM','tempIn','tempOut'].forEach(id=>$(id).addEventListener(id==='shapeSelect'?'change':'input',updateAll));
+    $('presetPaper').addEventListener('click',()=>setInputs({shape:'dodecahedron',a:0.5,gsm:17,Tin:60,Tout:26}));
+    $('presetCloth').addEventListener('click',()=>setInputs({shape:'dodecahedron',a:1.65,gsm:50,Tin:60,Tout:26}));
+    $('relaunch').addEventListener('click',relaunch);
+    $('printBtn').addEventListener('click',()=>window.print());
+    const tabs=[...document.querySelectorAll('.tab-btn')];
+    tabs.forEach((b,i)=>{
+        b.addEventListener('click',()=>setTab(b.dataset.tab));
+        b.addEventListener('keydown',e=>{
+            let n=null;
+            if(e.key==='ArrowRight') n=(i+1)%tabs.length; else if(e.key==='ArrowLeft') n=(i-1+tabs.length)%tabs.length;
+            else if(e.key==='Home') n=0; else if(e.key==='End') n=tabs.length-1;
+            if(n!==null){e.preventDefault();setTab(tabs[n].dataset.tab,true);}
+        });
+    });
+    init3D();
+    updateAll();
+    sim.y=sim.restY;
+    requestAnimationFrame(animate);
+});
+</script>
+</body>
+</html>
